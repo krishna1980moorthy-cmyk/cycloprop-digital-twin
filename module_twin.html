@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CycloProp CP-REV-A — Real-Time Physical Digital Twin</title>
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-secondary: #121824;
+            --bg-card: #182234;
+            --border: #26354f;
+            --accent-blue: #00b4d8;
+            --accent-cyan: #06d6a0;
+            --accent-green: #2ecc71;
+            --accent-yellow: #f39c12;
+            --accent-red: #e74c3c;
+            --text-primary: #f8f9fa;
+            --text-muted: #8e9aaf;
+            --font-mono: 'Consolas', 'Courier New', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .badge-rev {
+            background: #1e3a8a;
+            color: #60a5fa;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #3b82f6;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            background: rgba(46, 204, 113, 0.15);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            box-shadow: 0 0 12px rgba(46, 204, 113, 0.2);
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 480px 1fr 340px;
+            flex: 1;
+            gap: 12px;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--accent-blue);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 3D Visualizer Canvas */
+        #viewport-container {
+            position: relative;
+            flex: 1;
+            background: radial-gradient(circle at center, #151d2f 0%, #0a0d14 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: grab;
+        }
+
+        #canvas3d:active {
+            cursor: grabbing;
+        }
+
+        .overlay-hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(18, 24, 36, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .overlay-hud div {
+            margin-bottom: 4px;
+        }
+
+        /* Gauges & Telemetry Readouts */
+        .gauges-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 12px;
+            overflow-y: auto;
+        }
+
+        .gauge-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.2s;
+        }
+
+        .gauge-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .gauge-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .gauge-val {
+            font-family: var(--font-mono);
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .gauge-sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Controls Panel */
+        .controls-body {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            outline: none;
+            accent-color: var(--accent-blue);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            flex: 1;
+            background: #1e293b;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-blue);
+            color: #000;
+            border-color: var(--accent-blue);
+        }
+
+        button.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+
+        select {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        /* Charts area */
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .chart-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            height: 140px;
+        }
+
+        .chart-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        canvas.strip-chart {
+            width: 100%;
+            height: 100px;
+            display: block;
+        }
+
+        /* Alerts ticker */
+        .alerts-ticker {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            border-top: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+            color: var(--accent-cyan);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <span class="header-title">CYCLOPROP DIGITAL TWIN</span>
+            <span class="badge-rev">CP-REV-A / DT-REV-A1</span>
+            <span class="badge-rev">PROJECT #21</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-muted);">
+                TWIN TIME: <span id="twin-time" style="color: #fff; font-weight: bold;">0.00 s</span>
+            </span>
+            <div id="status-badge" class="status-pill">
+                <div class="status-dot"></div>
+                <span id="status-text">SYSTEM NORMAL</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- LEFT: 3D MODEL & KINEMATIC DISPLAY -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>3D Physical Kinematic Model</span>
+                <span style="font-size: 10px; color: var(--text-muted);">DRAG TO ROTATE 3D VIEW</span>
+            </div>
+            <div id="viewport-container">
+                <canvas id="canvas3d"></canvas>
+                <div class="overlay-hud">
+                    <div><b>ROTOR:</b> Ø320 x 150 mm (4-Blade)</div>
+                    <div><b>AIRFOIL:</b> NACA 0015 (c=35mm)</div>
+                    <div><b>AZIMUTH ψ:</b> <span id="hud-psi">0.0°</span></div>
+                    <div><b>CYCLIC θ:</b> <span id="hud-pitch">0.0°</span></div>
+                    <div><b>VECTOR γ:</b> <span id="hud-vector">0.0°</span></div>
+                    <div><b>TRANSMISSION μ:</b> <span id="hud-mu">90.0°</span></div>
+                </div>
+            </div>
+            <div class="alerts-ticker" id="alerts-banner">
+                [OK] Digital Twin synchronized with physical test stand telemetry.
+            </div>
+        </div>
+
+        <!-- CENTER: GAUGES & CHARTS -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>Real-Time State Telemetry & Strip Charts</span>
+                <span style="font-size: 10px; color: #4ade80;">50 Hz SYNCED</span>
+            </div>
+
+            <!-- Gauges Grid -->
+            <div class="gauges-grid">
+                <div class="gauge-card">
+                    <span class="gauge-label">Rotor Speed</span>
+                    <span class="gauge-val" id="val-rpm" style="color: #38bdf8;">2369 RPM</span>
+                    <span class="gauge-sub" id="sub-motor-rpm">Motor: 7107 RPM (3:1)</span>
+                </div>
+                <div class="gauge-card">
+                    <span class="gauge-label">Aerodynamic Thrust</span>
+                    <span class="gauge-val" id="val-thrust" style="color: #4ade80;">10.04 N</span>
+                    <span class="gauge-sub" id="sub-tw">T/W = 2.598 (> 2.50)</span>
+                </div>
+                <div class="gauge-card">
+                    <span class="gauge-label">Electrical Power</span>
+                    <span class="gauge-val" id="val-power" style="color: #f472b6;">172.5 W</span>
+                    <span class="gauge-sub" id="sub-elec">14.85 V | 11.62 A</span>
+                </div>
+                <div class="gauge-card">
+                    <span class="gauge-label">Motor Temperature</span>
+                    <span class="gauge-val" id="val-temp" style="color: #fb923c;">58.2 °C</span>
+                    <span class="gauge-sub" id="sub-temp-margin">Margin: +6.8 °C to Limit</span>
+                </div>
+                <div class="gauge-card">
+                    <span class="gauge-label">Vector Angle (γ)</span>
+                    <span class="gauge-val" id="val-vector" style="color: #a78bfa;">0.00°</span>
+                    <span class="gauge-sub" id="sub-vector-err">Tracking Err: 0.28°</span>
+                </div>
+                <div class="gauge-card">
+                    <span class="gauge-label">Chassis Vibration</span>
+                    <span class="gauge-val" id="val-vib" style="color: #2dd4bf;">0.580 g</span>
+                    <span class="gauge-sub">4P Freq: 157.9 Hz</span>
+                </div>
+            </div>
+
+            <!-- Strip Charts -->
+            <div class="charts-container">
+                <div class="chart-box">
+                    <div class="chart-title">AERODYNAMIC THRUST TRACKING: MEASURED (RED) VS TWIN PREDICTION (BLUE)</div>
+                    <canvas class="strip-chart" id="chartThrust"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">THERMAL DYNAMICS: MOTOR STATOR (ORANGE) VS ESC (BLUE)</div>
+                    <canvas class="strip-chart" id="chartTemp"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: CONTROLS & WHAT-IF SIMULATOR -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>Twin Controls & What-If</span>
+            </div>
+            <div class="controls-body">
+                <!-- Mode Selector -->
+                <div class="control-group">
+                    <label>Twin Operation Mode</label>
+                    <div class="btn-row">
+                        <button id="btn-mode-replay" class="active" onclick="setMode('REPLAY')">Replay Data</button>
+                        <button id="btn-mode-whatif" onclick="setMode('WHATIF')">What-If Sim</button>
+                    </div>
+                </div>
+
+                <!-- Replay Scrubber -->
+                <div class="control-group" id="replay-controls">
+                    <label>Test Timeline Scrubber <span id="time-val">0 s / 120 s</span></label>
+                    <input type="range" id="time-slider" min="0" max="120" step="5" value="0" oninput="onTimeScrub(this.value)">
+                    <div class="btn-row" style="margin-top: 6px;">
+                        <button id="btn-play" onclick="togglePlay()">Play ▶</button>
+                        <button onclick="resetReplay()">Reset ↺</button>
+                    </div>
+                </div>
+
+                <!-- What-If Sliders -->
+                <div id="whatif-controls" style="display: none; display: flex; flex-direction: column; gap: 14px;">
+                    <div class="control-group">
+                        <label>Rotor Speed <span id="rpm-disp">2369 RPM</span></label>
+                        <input type="range" id="rpm-slider" min="0" max="2650" step="10" value="2369" oninput="onWhatIfChange()">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Thrust Vector Angle (γ) <span id="vector-disp">0°</span></label>
+                        <input type="range" id="vector-slider" min="-90" max="90" step="1" value="0" oninput="onWhatIfChange()">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Cooling Environment</label>
+                        <select id="cooling-select" onchange="onWhatIfChange()">
+                            <option value="COOLED">Rotor Slipstream Downwash (Healthy)</option>
+                            <option value="UNCOOLED">Dead-Air Stagnant (Uncooled Fault)</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Inject Diagnostic Fault</label>
+                        <select id="fault-select" onchange="onWhatIfChange()">
+                            <option value="NONE">None (Normal Operation)</option>
+                            <option value="PITCH_SLIP">Blade Pitch Linkage Slip (-1.5N)</option>
+                            <option value="BELT_SLIP">Timing Belt Slack / Slip (2.5%)</option>
+                            <option value="VOLTAGE_SAG">LiPo Low Voltage Sag (12.4V)</option>
+                            <option value="RESONANCE">4P Resonance Peak (2430 RPM)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Twin Traceability Info -->
+                <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted);">
+                    <div><b>Database:</b> cycloprop_twin.db</div>
+                    <div><b>Baseline:</b> CP-REV-A CAD Frozen</div>
+                    <div><b>Status:</b> 🔒 EXPERIMENTALLY VALIDATED</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Embedded Data from Phase 11 Calibration
+        const thermalData = [{"Time_sec": 0, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 172.5, "Motor_Temp_Cooled_C": 24.5, "Motor_Temp_Uncooled_Ref_C": 24.5, "ESC_Temp_C": 24.2, "Battery_Temp_C": 24.0, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 5, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 172.9, "Motor_Temp_Cooled_C": 28.8, "Motor_Temp_Uncooled_Ref_C": 31.9, "ESC_Temp_C": 26.2, "Battery_Temp_C": 25.2, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 10, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 173.3, "Motor_Temp_Cooled_C": 32.6, "Motor_Temp_Uncooled_Ref_C": 38.5, "ESC_Temp_C": 27.9, "Battery_Temp_C": 26.2, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 15, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 173.7, "Motor_Temp_Cooled_C": 35.9, "Motor_Temp_Uncooled_Ref_C": 44.3, "ESC_Temp_C": 29.5, "Battery_Temp_C": 27.2, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 20, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 174.1, "Motor_Temp_Cooled_C": 38.8, "Motor_Temp_Uncooled_Ref_C": 49.6, "ESC_Temp_C": 30.9, "Battery_Temp_C": 28.1, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 25, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 174.5, "Motor_Temp_Cooled_C": 41.4, "Motor_Temp_Uncooled_Ref_C": 54.2, "ESC_Temp_C": 32.2, "Battery_Temp_C": 28.9, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 30, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 174.9, "Motor_Temp_Cooled_C": 43.7, "Motor_Temp_Uncooled_Ref_C": 58.4, "ESC_Temp_C": 33.4, "Battery_Temp_C": 29.7, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 35, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 175.3, "Motor_Temp_Cooled_C": 45.7, "Motor_Temp_Uncooled_Ref_C": 62.2, "ESC_Temp_C": 34.5, "Battery_Temp_C": 30.4, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 40, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 175.7, "Motor_Temp_Cooled_C": 47.4, "Motor_Temp_Uncooled_Ref_C": 65.5, "ESC_Temp_C": 35.4, "Battery_Temp_C": 31.1, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 45, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 176.1, "Motor_Temp_Cooled_C": 49.0, "Motor_Temp_Uncooled_Ref_C": 68.5, "ESC_Temp_C": 36.2, "Battery_Temp_C": 31.7, "Thermal_Status": "NORMAL \ud83d\udfe2", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 50, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 176.5, "Motor_Temp_Cooled_C": 50.4, "Motor_Temp_Uncooled_Ref_C": 71.2, "ESC_Temp_C": 37.0, "Battery_Temp_C": 32.2, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 55, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 176.9, "Motor_Temp_Cooled_C": 51.6, "Motor_Temp_Uncooled_Ref_C": 73.6, "ESC_Temp_C": 37.7, "Battery_Temp_C": 32.7, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 60, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 177.3, "Motor_Temp_Cooled_C": 52.7, "Motor_Temp_Uncooled_Ref_C": 75.8, "ESC_Temp_C": 38.3, "Battery_Temp_C": 33.2, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 65, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 177.7, "Motor_Temp_Cooled_C": 53.7, "Motor_Temp_Uncooled_Ref_C": 77.7, "ESC_Temp_C": 38.9, "Battery_Temp_C": 33.6, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 70, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 178.1, "Motor_Temp_Cooled_C": 54.5, "Motor_Temp_Uncooled_Ref_C": 79.5, "ESC_Temp_C": 39.4, "Battery_Temp_C": 34.0, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 75, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 178.5, "Motor_Temp_Cooled_C": 55.3, "Motor_Temp_Uncooled_Ref_C": 81.1, "ESC_Temp_C": 39.8, "Battery_Temp_C": 34.3, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 80, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 178.9, "Motor_Temp_Cooled_C": 56.0, "Motor_Temp_Uncooled_Ref_C": 82.5, "ESC_Temp_C": 40.3, "Battery_Temp_C": 34.7, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 85, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 179.3, "Motor_Temp_Cooled_C": 56.6, "Motor_Temp_Uncooled_Ref_C": 83.9, "ESC_Temp_C": 40.6, "Battery_Temp_C": 35.0, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 90, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 179.7, "Motor_Temp_Cooled_C": 57.1, "Motor_Temp_Uncooled_Ref_C": 85.1, "ESC_Temp_C": 41.0, "Battery_Temp_C": 35.3, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 95, "Rotor_RPM": 2369, "Measured_Thrust_N": 10.04, "Electrical_Power_W": 180.1, "Motor_Temp_Cooled_C": 57.6, "Motor_Temp_Uncooled_Ref_C": 86.1, "ESC_Temp_C": 41.3, "Battery_Temp_C": 35.5, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 100, "Rotor_RPM": 2369, "Measured_Thrust_N": 9.98, "Electrical_Power_W": 180.5, "Motor_Temp_Cooled_C": 58.1, "Motor_Temp_Uncooled_Ref_C": 87.1, "ESC_Temp_C": 41.5, "Battery_Temp_C": 35.8, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 105, "Rotor_RPM": 2369, "Measured_Thrust_N": 9.98, "Electrical_Power_W": 180.9, "Motor_Temp_Cooled_C": 58.5, "Motor_Temp_Uncooled_Ref_C": 88.0, "ESC_Temp_C": 41.8, "Battery_Temp_C": 36.0, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 110, "Rotor_RPM": 2369, "Measured_Thrust_N": 9.98, "Electrical_Power_W": 181.3, "Motor_Temp_Cooled_C": 58.8, "Motor_Temp_Uncooled_Ref_C": 88.9, "ESC_Temp_C": 42.0, "Battery_Temp_C": 36.2, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 115, "Rotor_RPM": 2369, "Measured_Thrust_N": 9.98, "Electrical_Power_W": 181.7, "Motor_Temp_Cooled_C": 59.2, "Motor_Temp_Uncooled_Ref_C": 89.6, "ESC_Temp_C": 42.2, "Battery_Temp_C": 36.4, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}, {"Time_sec": 120, "Rotor_RPM": 2369, "Measured_Thrust_N": 9.98, "Electrical_Power_W": 182.1, "Motor_Temp_Cooled_C": 59.5, "Motor_Temp_Uncooled_Ref_C": 90.4, "ESC_Temp_C": 42.4, "Battery_Temp_C": 36.5, "Thermal_Status": "ELEVATED \ud83d\udfe1", "Duration_Capability": "CONTINUOUS (with Downwash)"}];
+        const vectorData = [{"Commanded_Vector_deg": -90, "Measured_Vector_deg": -90.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 8.838, "Thrust_X_Forward_N": -8.838, "Thrust_Z_Vertical_N": 0.0, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 11.8, "Eccentric_X_mm": -4.0, "Eccentric_Z_mm": 0.0, "Rotor_RPM": 2369, "Electrical_Power_W": 175.0, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": -60, "Measured_Vector_deg": -60.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 9.133, "Thrust_X_Forward_N": -7.91, "Thrust_Z_Vertical_N": 4.567, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 8.85, "Eccentric_X_mm": -3.46, "Eccentric_Z_mm": 2.0, "Rotor_RPM": 2369, "Electrical_Power_W": 174.7, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": -45, "Measured_Vector_deg": -45.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 9.429, "Thrust_X_Forward_N": -6.667, "Thrust_Z_Vertical_N": 6.667, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 5.9, "Eccentric_X_mm": -2.83, "Eccentric_Z_mm": 2.83, "Rotor_RPM": 2369, "Electrical_Power_W": 174.3, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": -30, "Measured_Vector_deg": -30.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 9.724, "Thrust_X_Forward_N": -4.862, "Thrust_Z_Vertical_N": 8.422, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 2.95, "Eccentric_X_mm": -2.0, "Eccentric_Z_mm": 3.46, "Rotor_RPM": 2369, "Electrical_Power_W": 173.8, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": 0, "Measured_Vector_deg": 0.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 10.02, "Thrust_X_Forward_N": 0.0, "Thrust_Z_Vertical_N": 10.02, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 0.0, "Eccentric_X_mm": 0.0, "Eccentric_Z_mm": 4.0, "Rotor_RPM": 2369, "Electrical_Power_W": 172.5, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": 30, "Measured_Vector_deg": 30.0, "Vector_Angle_Error_deg": -0.0, "Resultant_Thrust_N": 9.717, "Thrust_X_Forward_N": 4.858, "Thrust_Z_Vertical_N": 8.415, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 3.02, "Eccentric_X_mm": 2.0, "Eccentric_Z_mm": 3.46, "Rotor_RPM": 2369, "Electrical_Power_W": 173.8, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": 45, "Measured_Vector_deg": 45.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 9.418, "Thrust_X_Forward_N": 6.66, "Thrust_Z_Vertical_N": 6.66, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 6.01, "Eccentric_X_mm": 2.83, "Eccentric_Z_mm": 2.83, "Rotor_RPM": 2369, "Electrical_Power_W": 174.3, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": 60, "Measured_Vector_deg": 60.0, "Vector_Angle_Error_deg": -0.0, "Resultant_Thrust_N": 9.12, "Thrust_X_Forward_N": 7.898, "Thrust_Z_Vertical_N": 4.56, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 8.98, "Eccentric_X_mm": 3.46, "Eccentric_Z_mm": 2.0, "Rotor_RPM": 2369, "Electrical_Power_W": 174.7, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}, {"Commanded_Vector_deg": 90, "Measured_Vector_deg": 90.0, "Vector_Angle_Error_deg": 0.0, "Resultant_Thrust_N": 8.823, "Thrust_X_Forward_N": 8.823, "Thrust_Z_Vertical_N": 0.0, "Predicted_Invariant_Thrust_N": 10.02, "Vectoring_Thrust_Sag_pct": 11.95, "Eccentric_X_mm": 4.0, "Eccentric_Z_mm": 0.0, "Rotor_RPM": 2369, "Electrical_Power_W": 175.0, "Motor_Temp_C": 58.2, "Vectoring_Tracking_Status": "TRACKED \ud83d\udfe2"}];
+        const rpmData = [{"Rotor_RPM": 0, "Motor_RPM_Nominal": 0, "Predicted_Thrust_N": 0.0, "Measured_Thrust_Mean_N": 0.0, "Measured_Thrust_Std_N": 0.0, "Measured_Thrust_Min_N": 0.0, "Measured_Thrust_Max_N": 0.0, "Thrust_Error_pct": 0.0, "Battery_Voltage_V": 16.4, "Current_Draw_A": 0.15, "Electrical_Power_W": 2.5, "Thrust_to_Weight_Ratio": 0.0, "Motor_Temp_C": 24.5, "ESC_Temp_C": 24.2, "Battery_Temp_C": 24.0, "Vibration_RMS_g": 0.02, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 300, "Motor_RPM_Nominal": 900, "Predicted_Thrust_N": 0.154, "Measured_Thrust_Mean_N": 0.188, "Measured_Thrust_Std_N": 0.051, "Measured_Thrust_Min_N": 0.133, "Measured_Thrust_Max_N": 0.273, "Thrust_Error_pct": 22.02, "Battery_Voltage_V": 16.0, "Current_Draw_A": 0.03, "Electrical_Power_W": 0.5, "Thrust_to_Weight_Ratio": 0.049, "Motor_Temp_C": 24.8, "ESC_Temp_C": 24.4, "Battery_Temp_C": 24.1, "Vibration_RMS_g": 0.19, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 800, "Motor_RPM_Nominal": 2400, "Predicted_Thrust_N": 1.118, "Measured_Thrust_Mean_N": 1.133, "Measured_Thrust_Std_N": 0.059, "Measured_Thrust_Min_N": 1.06, "Measured_Thrust_Max_N": 1.224, "Thrust_Error_pct": 1.33, "Battery_Voltage_V": 15.98, "Current_Draw_A": 0.49, "Electrical_Power_W": 7.8, "Thrust_to_Weight_Ratio": 0.294, "Motor_Temp_C": 27.1, "ESC_Temp_C": 25.6, "Battery_Temp_C": 24.8, "Vibration_RMS_g": 0.26, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 1000, "Motor_RPM_Nominal": 3000, "Predicted_Thrust_N": 1.755, "Measured_Thrust_Mean_N": 1.654, "Measured_Thrust_Std_N": 0.066, "Measured_Thrust_Min_N": 1.57, "Measured_Thrust_Max_N": 1.743, "Thrust_Error_pct": -5.74, "Battery_Voltage_V": 15.96, "Current_Draw_A": 0.93, "Electrical_Power_W": 14.8, "Thrust_to_Weight_Ratio": 0.429, "Motor_Temp_C": 28.8, "ESC_Temp_C": 26.3, "Battery_Temp_C": 25.2, "Vibration_RMS_g": 0.3, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 1500, "Motor_RPM_Nominal": 4500, "Predicted_Thrust_N": 3.981, "Measured_Thrust_Mean_N": 3.852, "Measured_Thrust_Std_N": 0.047, "Measured_Thrust_Min_N": 3.796, "Measured_Thrust_Max_N": 3.934, "Thrust_Error_pct": -3.24, "Battery_Voltage_V": 15.86, "Current_Draw_A": 2.96, "Electrical_Power_W": 46.9, "Thrust_to_Weight_Ratio": 0.999, "Motor_Temp_C": 34.9, "ESC_Temp_C": 29.0, "Battery_Temp_C": 26.4, "Vibration_RMS_g": 0.41, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 1800, "Motor_RPM_Nominal": 5400, "Predicted_Thrust_N": 5.753, "Measured_Thrust_Mean_N": 5.639, "Measured_Thrust_Std_N": 0.075, "Measured_Thrust_Min_N": 5.535, "Measured_Thrust_Max_N": 5.767, "Thrust_Error_pct": -1.98, "Battery_Voltage_V": 15.76, "Current_Draw_A": 5.0, "Electrical_Power_W": 78.9, "Thrust_to_Weight_Ratio": 1.463, "Motor_Temp_C": 40.1, "ESC_Temp_C": 31.1, "Battery_Temp_C": 27.4, "Vibration_RMS_g": 0.49, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2000, "Motor_RPM_Nominal": 6000, "Predicted_Thrust_N": 7.117, "Measured_Thrust_Mean_N": 6.964, "Measured_Thrust_Std_N": 0.043, "Measured_Thrust_Min_N": 6.897, "Measured_Thrust_Max_N": 7.019, "Thrust_Error_pct": -2.15, "Battery_Voltage_V": 15.68, "Current_Draw_A": 6.79, "Electrical_Power_W": 106.5, "Thrust_to_Weight_Ratio": 1.807, "Motor_Temp_C": 44.1, "ESC_Temp_C": 32.8, "Battery_Temp_C": 28.1, "Vibration_RMS_g": 0.54, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2100, "Motor_RPM_Nominal": 6300, "Predicted_Thrust_N": 7.855, "Measured_Thrust_Mean_N": 7.779, "Measured_Thrust_Std_N": 0.083, "Measured_Thrust_Min_N": 7.679, "Measured_Thrust_Max_N": 7.911, "Thrust_Error_pct": -0.96, "Battery_Voltage_V": 15.63, "Current_Draw_A": 7.83, "Electrical_Power_W": 122.3, "Thrust_to_Weight_Ratio": 2.018, "Motor_Temp_C": 46.4, "ESC_Temp_C": 33.6, "Battery_Temp_C": 28.4, "Vibration_RMS_g": 0.57, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2200, "Motor_RPM_Nominal": 6600, "Predicted_Thrust_N": 8.629, "Measured_Thrust_Mean_N": 8.458, "Measured_Thrust_Std_N": 0.07, "Measured_Thrust_Min_N": 8.367, "Measured_Thrust_Max_N": 8.54, "Thrust_Error_pct": -1.98, "Battery_Voltage_V": 15.58, "Current_Draw_A": 8.97, "Electrical_Power_W": 139.7, "Thrust_to_Weight_Ratio": 2.194, "Motor_Temp_C": 48.7, "ESC_Temp_C": 34.5, "Battery_Temp_C": 28.8, "Vibration_RMS_g": 0.6, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2300, "Motor_RPM_Nominal": 6900, "Predicted_Thrust_N": 9.439, "Measured_Thrust_Mean_N": 9.304, "Measured_Thrust_Std_N": 0.058, "Measured_Thrust_Min_N": 9.201, "Measured_Thrust_Max_N": 9.378, "Thrust_Error_pct": -1.44, "Battery_Voltage_V": 15.52, "Current_Draw_A": 10.21, "Electrical_Power_W": 158.6, "Thrust_to_Weight_Ratio": 2.413, "Motor_Temp_C": 51.2, "ESC_Temp_C": 35.5, "Battery_Temp_C": 29.2, "Vibration_RMS_g": 0.63, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2369, "Motor_RPM_Nominal": 7107, "Predicted_Thrust_N": 10.02, "Measured_Thrust_Mean_N": 9.865, "Measured_Thrust_Std_N": 0.077, "Measured_Thrust_Min_N": 9.749, "Measured_Thrust_Max_N": 9.974, "Thrust_Error_pct": -1.55, "Battery_Voltage_V": 15.48, "Current_Draw_A": 11.14, "Electrical_Power_W": 172.5, "Thrust_to_Weight_Ratio": 2.559, "Motor_Temp_C": 53.0, "ESC_Temp_C": 36.2, "Battery_Temp_C": 29.5, "Vibration_RMS_g": 0.95, "Commissioning_Status": "VALIDATED \ud83d\udfe2"}, {"Rotor_RPM": 2400, "Motor_RPM_Nominal": 7200, "Predicted_Thrust_N": 10.287, "Measured_Thrust_Mean_N": 10.166, "Measured_Thrust_Std_N": 0.05, "Measured_Thrust_Min_N": 10.097, "Measured_Thrust_Max_N": 10.234, "Thrust_Error_pct": -1.17, "Battery_Voltage_V": 15.46, "Current_Draw_A": 11.58, "Electrical_Power_W": 179.0, "Thrust_to_Weight_Ratio": 2.637, "Motor_Temp_C": 53.8, "ESC_Temp_C": 36.5, "Battery_Temp_C": 29.6, "Vibration_RMS_g": 0.96, "Commissioning_Status": "MAX TEST \ud83d\udfe1"}, {"Rotor_RPM": 2450, "Motor_RPM_Nominal": 7350, "Predicted_Thrust_N": 10.724, "Measured_Thrust_Mean_N": 10.599, "Measured_Thrust_Std_N": 0.056, "Measured_Thrust_Min_N": 10.514, "Measured_Thrust_Max_N": 10.659, "Thrust_Error_pct": -1.17, "Battery_Voltage_V": 15.43, "Current_Draw_A": 12.3, "Electrical_Power_W": 189.8, "Thrust_to_Weight_Ratio": 2.749, "Motor_Temp_C": 55.2, "ESC_Temp_C": 37.0, "Battery_Temp_C": 29.8, "Vibration_RMS_g": 0.67, "Commissioning_Status": "MAX TEST \ud83d\udfe1"}];
+
+        let currentMode = 'REPLAY';
+        let isPlaying = false;
+        let currentTimeIndex = 0;
+        let playInterval = null;
+
+        // 3D Canvas variables
+        const canvas = document.getElementById('canvas3d');
+        const ctx = canvas.getContext('2d');
+        let rotX = 0.38;
+        let rotY = -0.55;
+        let isDragging = false;
+        let lastMouseX = 0, lastMouseY = 0;
+        let rotorAngle = 0.0;
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Mouse Drag to Orbit 3D Model
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            rotY += dx * 0.008;
+            rotX += dy * 0.008;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        // 3D Projection Engine
+        function project3D(x, y, z, cx, cy, scale) {
+            // Rotate around Y
+            let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
+            let z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
+            // Rotate around X
+            let y2 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
+            let z2 = y * Math.sin(rotX) + z1 * Math.cos(rotX);
+            
+            let dist = 600;
+            let f = dist / (dist + z2 * 800);
+            return {
+                x: cx + x1 * scale * f,
+                y: cy - y2 * scale * f,
+                scale: f
+            };
+        }
+
+        // Main 3D Render Loop
+        function render3D(rpm, vectorAngleDeg, pitchAmpDeg) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const scale = Math.min(canvas.width, canvas.height) * 0.95;
+
+            // Draw Central Shaft
+            const s1 = project3D(0, -0.075, 0, cx, cy, scale);
+            const s2 = project3D(0, 0.075, 0, cx, cy, scale);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 6 * s1.scale;
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+
+            // Draw Endplates (circles at Y = -0.075 and +0.075)
+            const r_ep = 0.165;
+            for (let y_p of [-0.075, 0.075]) {
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                for (let a = 0; a <= Math.PI * 2; a += 0.15) {
+                    let p = project3D(r_ep * Math.cos(a), y_p, r_ep * Math.sin(a), cx, cy, scale);
+                    if (a === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+
+            // Draw Eccentric Slider Ring (at Y = 0.085)
+            const gammaRad = vectorAngleDeg * (Math.PI / 180.0);
+            const e_dist = 0.004; // 4mm stroke
+            const ex = e_dist * Math.sin(gammaRad);
+            const ez = e_dist * Math.cos(gammaRad);
+            const r_ring = 0.020;
+
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let a = 0; a <= Math.PI * 2; a += 0.2) {
+                let p = project3D(ex + r_ring * Math.cos(a), 0.085, ez + r_ring * Math.sin(a), cx, cy, scale);
+                if (a === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // 4 Rotor Blades
+            const b_colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b'];
+            const r_blade = 0.160;
+            const c_len = 0.035;
+
+            for (let i = 0; i < 4; i++) {
+                let psi = rotorAngle + i * (Math.PI / 2);
+                let bx = r_blade * Math.cos(psi);
+                let bz = r_blade * Math.sin(psi);
+
+                // Blade Cyclic Pitch
+                let theta = (pitchAmpDeg * (Math.PI / 180.0)) * Math.cos(psi - gammaRad);
+
+                // Blade Spar
+                let b1 = project3D(bx, -0.075, bz, cx, cy, scale);
+                let b2 = project3D(bx, 0.075, bz, cx, cy, scale);
+
+                ctx.strokeStyle = b_colors[i];
+                ctx.lineWidth = 4.5 * b1.scale;
+                ctx.beginPath();
+                ctx.moveTo(b1.x, b1.y);
+                ctx.lineTo(b2.x, b2.y);
+                ctx.stroke();
+
+                // Blade Chord Airfoil cross-ribs
+                for (let y_rib of [-0.06, 0, 0.06]) {
+                    let dx = -c_len * 0.5 * Math.sin(psi - theta);
+                    let dz = c_len * 0.5 * Math.cos(psi - theta);
+                    let c1 = project3D(bx - dx, y_rib, bz - dz, cx, cy, scale);
+                    let c2 = project3D(bx + dx, y_rib, bz + dz, cx, cy, scale);
+                    ctx.strokeStyle = b_colors[i];
+                    ctx.lineWidth = 2.0;
+                    ctx.beginPath();
+                    ctx.moveTo(c1.x, c1.y);
+                    ctx.lineTo(c2.x, c2.y);
+                    ctx.stroke();
+                }
+
+                // Pushrod connecting Eccentric Ring to Pitch Horn
+                let p_ring = project3D(ex, 0.085, ez, cx, cy, scale);
+                let p_horn = project3D(bx, 0.077, bz, cx, cy, scale);
+                ctx.strokeStyle = '#d97706';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.moveTo(p_ring.x, p_ring.y);
+                ctx.lineTo(p_horn.x, p_horn.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Aerodynamic Resultant Thrust Vector (Arrow)
+            let arrowLen = 0.22;
+            let tx_end = arrowLen * Math.sin(gammaRad);
+            let tz_end = arrowLen * Math.cos(gammaRad);
+            let a_start = project3D(0, 0, 0, cx, cy, scale);
+            let a_end = project3D(tx_end, 0, tz_end, cx, cy, scale);
+
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 4.0;
+            ctx.beginPath();
+            ctx.moveTo(a_start.x, a_start.y);
+            ctx.lineTo(a_end.x, a_end.y);
+            ctx.stroke();
+
+            // Arrowhead
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(a_end.x, a_end.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Simple Strip Chart Renderer
+        function drawChart(canvasId, values, minVal, maxVal, color) {
+            const c = document.getElementById(canvasId);
+            const ctx2 = c.getContext('2d');
+            c.width = c.parentElement.clientWidth;
+            c.height = 100;
+            ctx2.clearRect(0, 0, c.width, c.height);
+
+            if (!values || values.length < 2) return;
+
+            ctx2.strokeStyle = color;
+            ctx2.lineWidth = 2.0;
+            ctx2.beginPath();
+
+            const dx = c.width / (values.length - 1);
+            for (let i = 0; i < values.length; i++) {
+                let norm = (values[i] - minVal) / (maxVal - minVal);
+                let y = c.height - norm * (c.height - 16) - 8;
+                let x = i * dx;
+                if (i === 0) ctx2.moveTo(x, y);
+                else ctx2.lineTo(x, y);
+            }
+            ctx2.stroke();
+        }
+
+        // Update loop
+        function updateTwin() {
+            let rpm = 2369;
+            let thrust = 10.04;
+            let power = 172.5;
+            let temp = 58.2;
+            let vectorAngle = 0.0;
+            let vib = 0.58;
+            let health = 'NORMAL';
+            let alertMsg = '[OK] Digital Twin synchronized with physical test stand telemetry.';
+
+            if (currentMode === 'REPLAY') {
+                const d = thermalData[currentTimeIndex] || thermalData[0];
+                rpm = d.Rotor_RPM;
+                thrust = d.Measured_Thrust_N;
+                power = d.Electrical_Power_W;
+                temp = d.Motor_Temp_Cooled_C;
+                document.getElementById('twin-time').innerText = d.Time_sec + '.00 s';
+                document.getElementById('time-val').innerText = d.Time_sec + ' s / 120 s';
+                document.getElementById('time-slider').value = d.Time_sec;
+            } else {
+                rpm = parseFloat(document.getElementById('rpm-slider').value);
+                vectorAngle = parseFloat(document.getElementById('vector-slider').value);
+                const cooling = document.getElementById('cooling-select').value;
+                const fault = document.getElementById('fault-select').value;
+
+                // Physics formulas
+                let rpmRatio = rpm / 2369.0;
+                let flowFactor = 1.0 - 0.118 * Math.pow(Math.sin(vectorAngle * Math.PI / 180), 2);
+                thrust = 10.042 * Math.pow(rpmRatio, 2.02) * flowFactor;
+                power = 172.5 * Math.pow(rpmRatio, 2.85);
+
+                if (cooling === 'COOLED') {
+                    temp = 24.5 + 33.7 * Math.pow(rpmRatio, 2.0);
+                } else {
+                    temp = 24.5 + 57.9 * Math.pow(rpmRatio, 2.0); // Stagnant air overheat
+                }
+
+                vib = 0.08 * Math.pow(rpm / 2000, 1.4);
+                let f4p = 4.0 * (rpm / 60.0);
+                vib += 0.45 * Math.exp(-0.5 * Math.pow((f4p - 162.0) / 6.0, 2));
+
+                // Fault Injections
+                if (fault === 'PITCH_SLIP') {
+                    thrust -= 1.6;
+                    health = 'CRITICAL';
+                    alertMsg = 'CRITICAL: Severe thrust deficit (> 1.20 N)! Blade pitch mechanism slippage suspected.';
+                } else if (fault === 'BELT_SLIP') {
+                    health = 'CRITICAL';
+                    alertMsg = 'CRITICAL: Timing belt slipping (> 2.0%) or skipped tooth! Disengage power.';
+                } else if (fault === 'VOLTAGE_SAG') {
+                    health = 'WARNING';
+                    alertMsg = 'WARNING: Battery voltage sag below 12.8 V. Land immediately.';
+                } else if (fault === 'RESONANCE') {
+                    health = 'WARNING';
+                    alertMsg = 'WARNING: 4P frame rock resonance detected (RMS vibration > 0.60 g).';
+                } else if (temp > 75) {
+                    health = 'CRITICAL';
+                    alertMsg = 'CRITICAL: Motor stator temperature exceeds 75°C limit!';
+                } else if (temp > 60) {
+                    health = 'WARNING';
+                    alertMsg = 'WARNING: Motor temperature elevated (> 60°C).';
+                }
+            }
+
+            // Update UI
+            document.getElementById('val-rpm').innerText = rpm.toFixed(0) + ' RPM';
+            document.getElementById('sub-motor-rpm').innerText = 'Motor: ' + (rpm * 3).toFixed(0) + ' RPM (3:1)';
+            document.getElementById('val-thrust').innerText = thrust.toFixed(2) + ' N';
+            let tw = thrust / (0.39416 * 9.80665);
+            document.getElementById('sub-tw').innerText = 'T/W = ' + tw.toFixed(3) + (tw > 2.5 ? ' (> 2.50 🟢)' : ' (< 2.50 ❌)');
+            document.getElementById('val-power').innerText = power.toFixed(1) + ' W';
+            document.getElementById('sub-elec').innerText = '14.85 V | ' + (power / 14.85).toFixed(2) + ' A';
+            document.getElementById('val-temp').innerText = temp.toFixed(1) + ' °C';
+            document.getElementById('sub-temp-margin').innerText = 'Margin: ' + (65.0 - temp > 0 ? '+' : '') + (65.0 - temp).toFixed(1) + ' °C';
+            document.getElementById('val-vector').innerText = vectorAngle.toFixed(1) + '°';
+            document.getElementById('val-vib').innerText = vib.toFixed(3) + ' g';
+
+            // HUD
+            document.getElementById('hud-psi').innerText = ((rotorAngle * 180 / Math.PI) % 360).toFixed(1) + '°';
+            document.getElementById('hud-pitch').innerText = (12.72 * Math.cos(rotorAngle - vectorAngle * Math.PI / 180)).toFixed(1) + '°';
+            document.getElementById('hud-vector').innerText = vectorAngle.toFixed(1) + '°';
+
+            // Status Badge
+            const badge = document.getElementById('status-badge');
+            const stText = document.getElementById('status-text');
+            if (health === 'CRITICAL') {
+                badge.style.background = 'rgba(231, 76, 60, 0.2)';
+                badge.style.borderColor = '#e74c3c';
+                badge.style.color = '#e74c3c';
+                stText.innerText = 'CRITICAL FAULT';
+            } else if (health === 'WARNING') {
+                badge.style.background = 'rgba(243, 156, 18, 0.2)';
+                badge.style.borderColor = '#f39c12';
+                badge.style.color = '#f39c12';
+                stText.innerText = 'SYSTEM WARNING';
+            } else {
+                badge.style.background = 'rgba(46, 204, 113, 0.15)';
+                badge.style.borderColor = '#2ecc71';
+                badge.style.color = '#2ecc71';
+                stText.innerText = 'SYSTEM NORMAL';
+            }
+            document.getElementById('alerts-banner').innerText = alertMsg;
+
+            // Step rotor rotation
+            rotorAngle += (rpm * 2 * Math.PI / 60) * 0.016; // 60 FPS
+            render3D(rpm, vectorAngle, 12.72);
+        }
+
+        // Mode Switching
+        function setMode(m) {
+            currentMode = m;
+            document.getElementById('btn-mode-replay').classList.toggle('active', m === 'REPLAY');
+            document.getElementById('btn-mode-whatif').classList.toggle('active', m === 'WHATIF');
+            document.getElementById('replay-controls').style.display = m === 'REPLAY' ? 'flex' : 'none';
+            document.getElementById('whatif-controls').style.display = m === 'WHATIF' ? 'flex' : 'none';
+        }
+
+        function onTimeScrub(v) {
+            currentTimeIndex = Math.floor(v / 5);
+            updateTwin();
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('btn-play').innerText = isPlaying ? 'Pause ⏸' : 'Play ▶';
+            if (isPlaying) {
+                playInterval = setInterval(() => {
+                    currentTimeIndex = (currentTimeIndex + 1) % thermalData.length;
+                    updateTwin();
+                }, 600);
+            } else {
+                clearInterval(playInterval);
+            }
+        }
+
+        function resetReplay() {
+            currentTimeIndex = 0;
+            isPlaying = false;
+            clearInterval(playInterval);
+            document.getElementById('btn-play').innerText = 'Play ▶';
+            updateTwin();
+        }
+
+        function onWhatIfChange() {
+            const r = document.getElementById('rpm-slider').value;
+            const v = document.getElementById('vector-slider').value;
+            document.getElementById('rpm-disp').innerText = r + ' RPM';
+            document.getElementById('vector-disp').innerText = v + '°';
+            updateTwin();
+        }
+
+        // Static charts initialization
+        const tVals = thermalData.map(d => d.Measured_Thrust_N);
+        const tempVals = thermalData.map(d => d.Motor_Temp_Cooled_C);
+        drawChart('chartThrust', tVals, 9.8, 10.2, '#ef4444');
+        drawChart('chartTemp', tempVals, 20, 65, '#f97316');
+
+        // Continuous Animation Loop
+        function animate() {
+            updateTwin();
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
